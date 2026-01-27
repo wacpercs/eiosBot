@@ -1,0 +1,46 @@
+# Telegram Bot
+aiogram==3.3.0
+aiohttp==3.9.1
+
+# Web framework (для Mini App и webhook'ов)
+fastapi==0.108.0
+uvicorn[standard]==0.25.0
+
+# База данных
+sqlalchemy==2.0.25
+alembic==1.13.1
+asyncpg==0.29.0  # для PostgreSQL
+aiosqlite==0.19.0  # для SQLite (для разработки)
+
+# Redis для кэширования и очередей
+redis==5.0.1
+aioredis==2.0.1
+
+# Utilities
+python-dotenv==1.0.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# Логирование и мониторинг
+loguru==0.7.2
+
+# Работа с датами
+python-dateutil==2.8.2
+
+# HTTP клиент
+httpx==0.26.0
+
+# Криптография (для токенов)
+cryptography==41.0.7
+pyjwt==2.8.0
+
+# Для работы с Excel/CSV (экспорт оценок)
+pandas==2.1.4
+openpyxl==3.1.2
+
+# Для разработки
+pytest==7.4.3
+pytest-asyncio==0.23.3
+black==23.12.1
+flake8==7.0.0
+mypy==1.8.0

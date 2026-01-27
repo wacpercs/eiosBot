@@ -1,0 +1,111 @@
+version: '3.8'
+
+services:
+  # PostgreSQL база данных
+  postgres:
+    image: postgres:15-alpine
+    container_name: eios_bot_db
+    environment:
+      POSTGRES_DB: eios_bot
+      POSTGRES_USER: eios_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eios_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis для кэширования
+  redis:
+    image: redis:7-alpine
+    container_name: eios_bot_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # Telegram Bot
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: eios_telegram_bot
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - DATABASE_URL=postgresql+asyncpg://eios_user:${DB_PASSWORD:-changeme}@postgres:5432/eios_bot
+      - REDIS_URL=redis://redis:6379/0
+      - WEBAPP_URL=${WEBAPP_URL}
+      - EIOS_API_URL=${EIOS_API_URL}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    command: python telegram_bot.py
+    restart: unless-stopped
+
+  # Webhook Server (FastAPI)
+  webhook:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: eios_webhook_server
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://eios_user:${DB_PASSWORD:-changeme}@postgres:5432/eios_bot
+      - REDIS_URL=redis://redis:6379/0
+      - WEBAPP_URL=${WEBAPP_URL}
+      - EIOS_API_URL=${EIOS_API_URL}
+      - EIOS_WEBHOOK_SECRET=${EIOS_WEBHOOK_SECRET}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./logs:/app/logs
+      - ./miniapp.html:/app/miniapp.html
+    command: uvicorn webhook_server:app --host 0.0.0.0 --port 8080
+    restart: unless-stopped
+
+  # Nginx для проксирования (опционально)
+  nginx:
+    image: nginx:alpine
+    container_name: eios_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - webhook
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  default:
+    name: eios_bot_network
